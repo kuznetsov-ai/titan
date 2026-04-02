@@ -1,0 +1,47 @@
+# Example system configuration
+name: backoffice
+base_url: http://localhost:3000
+environment: test  # test | prod
+
+auth:
+  type: login_password  # login_password | sso (future)
+  login_url: /login     # relative to base_url
+  username_selector: "input[name='email'], input[type='email'], input[name='username']"
+  password_selector: "input[name='password'], input[type='password']"
+  submit_selector: "button[type='submit']"
+
+roles:
+  - name: admin
+    username: admin@home.app
+    password: admin
+  # - name: manager
+  #   username: manager@home.app
+  #   password: manager123
+
+browser:
+  type: chromium  # chromium | firefox | webkit
+  headless: true
+  viewport:
+    width: 1920
+    height: 1080
+  timeout: 30000  # ms
+
+ai:
+  provider: anthropic       # anthropic | openai_compatible
+  model: claude-sonnet-4-20250514
+  # For openai_compatible:
+  # api_base: http://localhost:8080/v1
+  # api_key: your-key
+  # model: gpt-4o
+  depth: deep  # deep | fast
+
+crawl:
+  max_pages: 100
+  screenshot_delay: 1000    # ms, wait after page load
+  ignore_patterns:
+    - "/logout"
+    - "/api/*"
+  ignore_selectors:         # dynamic content to mask
+    - ".timestamp"
+    - ".user-avatar"
+    - "[data-testid='notification-count']"

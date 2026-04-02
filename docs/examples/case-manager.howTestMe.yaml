@@ -1,0 +1,218 @@
+# howTestMe.yaml — Case Manager
+# Пример заполненного файла для TITAN
+
+service:
+  name: case-manager
+  repo: git.exness.io/trading-anti-fraud/case-manager
+  local_path: /Users/evgenii.kuznetsov/Projects/Case manager/case-manager
+  type: backoffice
+  description: "Управление подозрительными кейсами (monitoring/reporting), suspects, дашборд аналитики"
+
+environment:
+  base_url: http://localhost:3000
+  setup: |
+    cd /Projects/Case manager/case-manager
+    docker compose -f docker-compose.bo.yml up -d
+    # Запустить отдельно:
+    # ./app api backoffice
+    # ./app daemon slack-sync
+    # ./app daemon susp-enricher
+  auth:
+    method: login_password
+    credentials:
+      - role: admin
+        username: ${TITAN_USERNAME:<your-email>}
+        password: ${TITAN_PASSWORD:<your-password>}
+  dependencies:
+    - "docker: PostgreSQL (5434:5432)"
+    - "docker: Kafka + Zookeeper"
+    - "docker: MinIO (9002:9000)"
+    - "process: ./app api backoffice"
+    - "process: ./app daemon slack-sync (для Slack-нотификаций)"
+    - "process: ./app daemon susp-enricher"
+
+test_cases:
+  ui:
+    # ── P0: Критичные (без них нельзя работать) ──
+
+    - id: TC-UI-01
+      name: "Загрузка страницы Case Manager"
+      tab: Cases
+      actions:
+        - "Открыть /case-manager"
+        - "Проверить вкладки: Cases, Suspects, Dashboard, Create Monitoring Case, Create Reporting Case, Settings"
+        - "Проверить кнопку Search и таблицу кейсов"
+      expected: "Все элементы видны, нет JS-ошибок"
+      priority: P0
+
+    - id: TC-UI-02
+      name: "Поиск кейсов"
+      tab: Cases
+      preconditions: "Есть хотя бы 1 кейс"
+      actions:
+        - "Нажать Search"
+        - "Проверить что таблица заполнена"
+      expected: "Таблица содержит строки"
+      priority: P0
+
+    - id: TC-UI-03
+      name: "Создание Monitoring Case"
+      tab: Create Monitoring Case
+      actions:
+        - "Заполнить title, user_uids (UUID), abuse_type, process, severity, description, jira_tickets"
+        - "Submit"
+      expected: "Кейс создан (200), появился в таблице"
+      priority: P0
+      validation_rules:
+        - "Все 7 полей обязательны"
+        - "user_uids: формат UUID (валидируется бэкендом, иначе 422)"
+        - "severity=critical → обязательны link + files"
+
+    - id: TC-UI-04
+      name: "Создание Reporting Case"
+      tab: Create Reporting Case
+      actions:
+        - "Заполнить user_uids (UUID), abuse_type, symbol, severity, description"
+        - "Для non-critical: приложить файл + выбрать suspicious_timeframe"
+        - "Для critical: заполнить link"
+        - "Submit"
+      expected: "Кейс создан (200)"
+      priority: P0
+      validation_rules:
+        - "user_uids, abuse_type, symbol, severity, description — обязательны всегда"
+        - "severity != critical → files + suspicious_timeframe обязательны"
+        - "severity = critical → link обязателен, files НЕ нужны"
+      edge_cases:
+        - "Создать 2 кейса: один medium (с файлом), один critical (с link, без файла)"
+
+    - id: TC-UI-05
+      name: "Просмотр и редактирование кейса"
+      tab: Cases
+      preconditions: "Есть кейсы в таблице"
+      actions:
+        - "Кликнуть ID кейса → открывается диалог деталей"
+        - "Изменить description, abuse_type, investigation_outcome"
+        - "Сохранить"
+      expected: "Диалог открыт, изменения сохранены без ошибок"
+      priority: P0
+
+    - id: TC-UI-06
+      name: "Статусный flow"
+      tab: Cases
+      preconditions: "Есть кейс в статусе new"
+      actions:
+        - "Сменить статус: new → in_progress"
+        - "Сменить статус: in_progress → closed (подтвердить в диалоге)"
+        - "Найти закрытый кейс (добавить Closed в фильтр caseStatuses!)"
+        - "Нажать Reopen (подтвердить)"
+      expected: "Каждый переход без ошибок"
+      priority: P0
+      edge_cases:
+        - "Закрытые кейсы скрыты из дефолтного поиска (фильтр = New + In Progress)"
+        - "Закрытие и переоткрытие требуют подтверждения"
+
+    # ── P1: Важные (основные flows) ──
+
+    - id: TC-UI-07
+      name: "Загрузка файла + Slack"
+      tab: Create Reporting Case
+      preconditions: "daemon slack-sync запущен"
+      actions:
+        - "Создать reporting case severity=medium с файлом"
+        - "Открыть кейс → проверить файл в деталях"
+        - "Проверить доставку файла в Slack-тред кейса"
+      expected: "Файл виден в UI, доставлен в Slack < 30 сек"
+      priority: P1
+      integrations:
+        - "MinIO: cases/{id}/filename"
+        - "Slack: EventCaseScreenshotAdded → тред кейса"
+
+    - id: TC-UI-08
+      name: "Комментарии и логи"
+      tab: Cases
+      preconditions: "Открыт диалог кейса"
+      actions:
+        - "Добавить комментарий"
+        - "Переключить на Logs"
+      expected: "Комментарий сохранён, логи загружены"
+      priority: P1
+
+    - id: TC-UI-09
+      name: "Навигация PREV/NEXT"
+      tab: Cases
+      preconditions: "Открыт диалог кейса, есть несколько кейсов"
+      actions:
+        - "Нажать NEXT → проверить смену кейса"
+        - "Нажать PREV → проверить возврат"
+      expected: "Навигация работает"
+      priority: P1
+
+    - id: TC-UI-10
+      name: "Suspects — поиск и детали"
+      tab: Suspects
+      actions:
+        - "Отключить фильтры has_updates и openOnly"
+        - "Search → проверить колонки: UID, Country, Cases, Client Profit, Black Flags, Abuse Ratio"
+        - "Кликнуть UUID → детали подозреваемого"
+        - "Проверить ссылки: Backoffice, Restrictions, Toxicity, Ticks"
+        - "Проверить переключатель With updates ON/OFF"
+      expected: "Таблица и детали загружены, ссылки присутствуют"
+      priority: P1
+
+    # ── P2: Второстепенные ──
+
+    - id: TC-UI-11
+      name: "Dashboard"
+      tab: Dashboard
+      actions:
+        - "Открыть Dashboard → FILTER"
+        - "Проверить графики (investigation outcomes, cases by processes, suspects by potential, cases by statuses)"
+        - "Проверить статистику (Total cases, Total suspects)"
+        - "Проверить фильтры: Process, Severity, Investigation Outcome, Country Code"
+      expected: "Графики рендерятся, статистика видна"
+      priority: P2
+
+    - id: TC-UI-12
+      name: "Settings — процессы"
+      tab: Settings
+      actions:
+        - "Открыть Settings → таблица процессов"
+        - "Проверить колонки: Name, Process name"
+        - "Кликнуть Edit → проверить inline input"
+      expected: "Таблица загружена, inline-редактирование работает"
+      priority: P2
+
+    - id: TC-UI-13
+      name: "Все вкладки загружаются"
+      tab: "*"
+      actions:
+        - "Последовательно кликнуть каждую из 6 вкладок"
+        - "Проверить отсутствие JS-ошибок и 500"
+      expected: "Все вкладки загружены без ошибок"
+      priority: P2
+
+    - id: TC-UI-14
+      name: "Reporter и Assignee не 'unknown'"
+      tab: Cases
+      actions:
+        - "Открыть таблицу кейсов"
+        - "Проверить колонки Reporter, Assignee, Updated By"
+      expected: "Нет значений 'unknown'"
+      priority: P2
+      known_bugs:
+        - "Ранее Reporter/Assignee отображались как 'unknown' — исправлено"
+
+ui_specifics:
+  framework: "Backoffice (schema-driven, CSS Modules)"
+  selector_patterns:
+    tabs: 'button[class*="Tab_tab"]:has-text("...")'
+    buttons: 'button[class*="Button_button"]:has-text("...")'
+    tables: 'table[class*="Table_table"]'
+    dropdowns: 'click input[name="field"] → button.ListItem_item'
+    dialogs: '[class*="Dialog_content"]'
+    file_input: '[class*="FileInput"]'
+  gotchas:
+    - "Custom Select: click input с force=True"
+    - "DatePicker: НЕ fill(), кликать пресеты"
+    - "Submit кнопки: scope через [class*='Button_button']"
+    - "Закрытые кейсы скрыты из дефолтного поиска"

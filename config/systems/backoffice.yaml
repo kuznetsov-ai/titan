@@ -1,0 +1,47 @@
+name: backoffice
+base_url: http://localhost:3000
+environment: test
+
+auth:
+  type: login_password
+  login_url: /login
+  username_selector: "input[placeholder='Email'], input[name='email'], input[type='email']"
+  password_selector: "input[placeholder='Password'], input[name='password'], input[type='password']"
+  submit_selector: "button:has-text('NEXT'), button:has-text('Next'), button[type='submit']"
+
+roles:
+  - name: admin
+    username: ${TITAN_USERNAME:admin@home.app}
+    password: ${TITAN_PASSWORD:admin}
+
+browser:
+  type: chromium
+  headless: true
+  viewport:
+    width: 1440
+    height: 900
+  ignore_https_errors: true  # OK for localhost; loader warns if enabled for non-local URLs
+  timeout: 30000
+
+ai:
+  provider: claude_cli       # claude_cli | anthropic | openai_compatible
+  model: sonnet              # for claude_cli: sonnet, opus, haiku
+  # provider: openai_compatible
+  # api_base: http://localhost:3456/v1
+  # api_key: not-needed
+  # model: claude-sonnet-4-20250514
+  depth: deep
+
+external_scenarios:
+  lthvc-check: /Users/evgenii.kuznetsov/Projects/reports/reporting-tool/pkg/reporters/lthvc_check/testMe
+  exd: /Users/evgenii.kuznetsov/Projects/reports/reporting-tool/pkg/reporters/exd/testMe
+
+crawl:
+  max_pages: 50
+  screenshot_delay: 1500
+  ignore_patterns:
+    - "/logout"
+    - "/api/*"
+  ignore_selectors:
+    - ".timestamp"
+    - "[data-testid='notification-count']"
