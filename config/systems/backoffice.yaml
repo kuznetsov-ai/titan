@@ -35,6 +35,8 @@ ai:
 external_scenarios:
   lthvc-check: /Users/evgenii.kuznetsov/Projects/reports/reporting-tool/pkg/reporters/lthvc_check/testMe
   exd: /Users/evgenii.kuznetsov/Projects/reports/reporting-tool/pkg/reporters/exd/testMe
+  exd-check: /Users/evgenii.kuznetsov/Projects/reports/reporting-tool/pkg/reporters/exd_check/testMe
+  case-manager-v2: /Users/evgenii.kuznetsov/Projects/Case manager/case-manager/testMe
 
 crawl:
   max_pages: 50

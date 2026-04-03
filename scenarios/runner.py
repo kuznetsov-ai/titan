@@ -79,7 +79,7 @@ def _load_external_scenario(scenario_name: str, config: SystemConfig):
     return None
 
 
-async def run_scenario(config: SystemConfig, scenario_name: str = "case-manager", only: list[str] | None = None) -> Path:
+async def run_scenario(config: SystemConfig, scenario_name: str = "case-manager", only: list[str] | None = None, random_n: int | None = None) -> Path:
     """Run an E2E scenario suite. Returns path to report."""
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     run_dir = Path("storage_layout/runs") / f"e2e_{timestamp}"
@@ -122,7 +122,7 @@ async def run_scenario(config: SystemConfig, scenario_name: str = "case-manager"
                 )
                 await asyncio.sleep(1)
                 suite = CaseManagerScenarios(page, config.base_url, run_dir)
-                results = await suite.run_all(only=only)
+                results = await suite.run_all(only=only, random_n=random_n)
                 all_results.extend(results)
 
             elif scenario_name in config.external_scenarios:
@@ -139,7 +139,7 @@ async def run_scenario(config: SystemConfig, scenario_name: str = "case-manager"
                 )
                 await asyncio.sleep(2)
                 suite = scenario_cls(page, config.base_url, run_dir)
-                results = await suite.run_all(only=only)
+                results = await suite.run_all(only=only, random_n=random_n)
                 all_results.extend(results)
 
             await context.close()
@@ -161,7 +161,7 @@ async def run_scenario(config: SystemConfig, scenario_name: str = "case-manager"
         for step in failed_steps:
             print(f"    Analyzing: {step.name}...")
             try:
-                analysis = ask_vision_json(
+                analysis = await ask_vision_json(
                     f"You are a QA engineer. This screenshot is from an E2E test step "
                     f"'{step.name}' that resulted in {step.status}.\n"
                     f"Step description: {step.description}\n"

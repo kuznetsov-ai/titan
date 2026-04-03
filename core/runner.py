@@ -54,8 +54,8 @@ async def run_session(config: SystemConfig, update_baselines: bool = False) -> P
             # AI Analysis
             print("  Analyzing pages with AI...")
             for result in results:
-                analysis = analyze_page(result, model=config.ai.model,
-                                        api_base=config.ai.api_base, api_key=config.ai.api_key)
+                analysis = await analyze_page(result, model=config.ai.model,
+                                              api_base=config.ai.api_base, api_key=config.ai.api_key)
                 all_analysis_results.append(analysis)
                 if analysis.status != "OK":
                     print(f"    [{analysis.status}][{analysis.severity}] {result.url} — {analysis.description[:80]}")
@@ -69,7 +69,7 @@ async def run_session(config: SystemConfig, update_baselines: bool = False) -> P
                     filename = Path(result.screenshot_path).name
                     baseline = get_baseline_path(config.name, role.name, filename)
                     if baseline:
-                        diff = compare_screenshots(
+                        diff = await compare_screenshots(
                             baseline, result.screenshot_path,
                             result.url, role.name, model=config.ai.model,
                             api_base=config.ai.api_base, api_key=config.ai.api_key,

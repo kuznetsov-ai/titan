@@ -49,7 +49,7 @@ If the page looks normal and healthy, respond with status OK and severity none.
 Respond ONLY with the JSON, no markdown fences."""
 
 
-def analyze_page(
+async def analyze_page(
     result: PageResult,
     model: str = "claude-sonnet-4-20250514",
     api_base: str | None = None,
@@ -71,7 +71,7 @@ def analyze_page(
     if result.screenshot_path and Path(result.screenshot_path).exists():
         image_paths.append(result.screenshot_path)
 
-    data = ask_vision_json(prompt, image_paths)
+    data = await ask_vision_json(prompt, image_paths)
 
     # Handle parse errors
     if "_error" in data:

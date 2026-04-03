@@ -1,20 +1,22 @@
-# howTestMe — Как подготовить сервис к тестированию через TITAN
+# howTestMe — How to prepare your service for TITAN testing
 
-**TITAN** (**T**esting **I**nterfaces, **T**ransactions **A**nd **N**etworks) — автоматическое тестирование UI, API, валидации и интеграций.
+**TITAN** (**T**esting **I**nterfaces, **T**ransactions **A**nd **N**etworks) — automated testing of UI, API, validation, and integrations.
 
-Чтобы TITAN мог протестировать ваш сервис, нужно подготовить папку `testMe/` в корне репозитория сервиса.
+To enable TITAN testing for your service, create a `testMe/` folder in your repository root.
 
----
-
-## Зачем это нужно
-
-TITAN не угадывает, что тестировать. Он работает по описанным кейсам. Без папки `testMe/` сервис **не тестируется**.
+> **IMPORTANT: All test cases, descriptions, comments, and documentation must be written in English.** No Russian or other non-English text in `howTestMe.yaml`, `ui_test_scenarios.py`, or any other files inside `testMe/`. This ensures consistency across all Exness repositories.
 
 ---
 
-## Папка `testMe/`
+## Why
 
-Каждая система / интерфейс / отчёт должна содержать папку `testMe/` в корне своего репозитория. Это единая точка входа для TITAN — всё, что нужно для тестирования, лежит здесь.
+TITAN does not guess what to test. It works from described test cases. Without a `testMe/` folder, the service **will not be tested**.
+
+---
+
+## `testMe/` folder structure
+
+Every system / interface / report must have a `testMe/` folder in its repository root. This is the single entry point for TITAN — everything needed for testing lives here.
 
 ```
 my-service/
@@ -22,278 +24,135 @@ my-service/
 ├── cmd/
 ├── ...
 └── testMe/
-    ├── howTestMe.yaml          # Главный файл: описание сервиса + тест-кейсы
-    ├── fixtures/               # Тестовые данные (JSON, CSV, файлы для upload)
+    ├── howTestMe.yaml          # Main file: service description + test cases
+    ├── ui_test_scenarios.py    # Playwright E2E scenarios for TITAN runner
+    ├── fixtures/               # Test data (JSON, CSV, files for upload)
     │   ├── test_attachment.png
     │   ├── valid_uuids.json
     │   └── ...
-    ├── mocks/                  # Моки внешних сервисов (опционально)
+    ├── mocks/                  # External service mocks (optional)
     │   └── ...
-    └── docs/                   # Доп. документация (опционально)
-        ├── validation_rules.md # Правила валидации полей
-        ├── status_flow.md      # Диаграмма статусных переходов
-        └── integrations.md     # Описание интеграций (Slack, MinIO, etc.)
+    └── docs/                   # Additional documentation (optional)
+        ├── validation_rules.md # Field validation rules
+        ├── status_flow.md      # State machine diagram
+        └── integrations.md     # External integrations (Slack, MinIO, etc.)
 ```
 
-### Обязательные файлы
+### Required files
 
-| Файл | Описание |
-|------|----------|
-| `howTestMe.yaml` | Описание сервиса, окружения, тест-кейсов, UI-специфики |
+| File | Description |
+|------|-------------|
+| `howTestMe.yaml` | Service description, environment, test cases, UI specifics |
+| `ui_test_scenarios.py` | Playwright test class with `run_all()` method |
 
-### Опциональные файлы
+### Optional files
 
-| Папка/файл | Когда нужен |
-|------------|-------------|
-| `fixtures/` | Есть файловые аплоады, нужны тестовые данные |
-| `mocks/` | Есть внешние зависимости, которые нужно замокать |
-| `docs/validation_rules.md` | Сложная валидация, которую трудно описать в YAML |
-| `docs/status_flow.md` | Есть статусная машина (new → in_progress → closed → ...) |
-| `docs/integrations.md` | Есть интеграции с внешними системами (Slack, Kafka, S3, ...) |
+| Path | When needed |
+|------|-------------|
+| `fixtures/` | File uploads, test data needed |
+| `mocks/` | External dependencies that need mocking |
+| `docs/validation_rules.md` | Complex validation hard to describe in YAML |
+| `docs/status_flow.md` | State machine (new → in_progress → closed → ...) |
+| `docs/integrations.md` | External system integrations (Slack, Kafka, S3, ...) |
 
-### Пример: Case Manager
+### Example: Case Manager
 
 ```
 case-manager/
 └── testMe/
-    ├── howTestMe.yaml          # 14 тест-кейсов, P0-P2
+    ├── howTestMe.yaml          # 14 test cases, P0-P2
+    ├── ui_test_scenarios.py    # 25 Playwright scenarios
     ├── fixtures/
-    │   └── test_attachment.png # Файл для теста загрузки
+    │   └── test_attachment.png # File for upload test
     └── docs/
         └── validation_rules.md # Monitoring vs Reporting, critical vs non-critical
 ```
 
 ---
 
-## Структура файла
+## `howTestMe.yaml` structure
 
 ```yaml
-# howTestMe.yaml — описание сервиса для TITAN
+# howTestMe.yaml — service description for TITAN
 service:
-  name: case-manager                    # slug сервиса
-  repo: git.exness.io/trading-anti-fraud/case-manager  # git-репозиторий
-  local_path: /Projects/Case manager/case-manager      # или локальный путь (опционально)
+  name: case-manager                    # service slug
+  repo: git.exness.io/trading-anti-fraud/case-manager  # git repository
+  local_path: /Projects/Case manager/case-manager      # local path (optional)
   type: backoffice                      # backoffice | web | api | mixed
-  description: "Управление подозрительными кейсами, suspects, дашборд"
+  description: "Suspicious cases management, suspects, dashboard"
 
-# Где взять работающий UI
+# Where to find the running UI
 environment:
-  base_url: http://localhost:3000       # URL для тестирования
-  setup: docker compose -f docker-compose.bo.yml up -d  # как поднять
+  base_url: http://localhost:3000       # URL for testing
+  setup: docker compose -f docker-compose.bo.yml up -d  # how to start
   auth:
     method: login_password              # login_password | token | oauth | none
     credentials:
       - role: admin
         username: ${TITAN_USERNAME:<your-email>}
         password: ${TITAN_PASSWORD:<your-password>}
-      - role: readonly
-        username: viewer@home.app
-        password: viewer
-  dependencies:                         # что ещё должно быть запущено
+  dependencies:                         # what else must be running
     - "docker: case-manager-fix-api-1 (./app api backoffice)"
     - "daemon: ./app daemon slack-sync"
-    - "daemon: ./app daemon susp-enricher"
     - "infra: PostgreSQL, Kafka, MinIO, Zookeeper"
 
-# Тест-кейсы — ядро документа
+# Test cases — the core of the document
 test_cases:
-  # ─── UI ──────────────────────────────────
   ui:
     - id: TC-UI-01
-      name: "Загрузка главной страницы"
+      name: "Page load"
       tab: Cases
       actions:
-        - "Открыть /case-manager"
-        - "Проверить наличие вкладок: Cases, Suspects, Dashboard, Create Monitoring Case, Create Reporting Case, Settings"
-        - "Проверить наличие кнопки Search"
-        - "Проверить наличие таблицы кейсов"
-      expected: "Страница загружена, все элементы видны, нет JS-ошибок"
+        - "Open /case-manager"
+        - "Verify tabs: Cases, Suspects, Dashboard, Create Monitoring Case, Create Reporting Case, Settings"
+        - "Verify Search button present"
+        - "Verify cases table present"
+      expected: "Page loaded, all elements visible, no JS errors"
       priority: P0
 
     - id: TC-UI-02
-      name: "Поиск кейсов"
+      name: "Search cases"
       tab: Cases
-      preconditions: "Есть хотя бы 1 кейс в системе"
+      preconditions: "At least 1 case exists"
       actions:
-        - "Нажать кнопку Search"
-        - "Дождаться загрузки таблицы"
-      expected: "Таблица содержит строки с данными"
+        - "Click Search button"
+        - "Wait for table to load"
+      expected: "Table contains data rows"
       priority: P0
 
     - id: TC-UI-03
-      name: "Создание Monitoring Case"
+      name: "Create Monitoring Case"
       tab: Create Monitoring Case
       actions:
-        - "Перейти на вкладку Create Monitoring Case"
-        - "Заполнить обязательные поля: title, user_uids (UUID), abuse_type, process, severity, description, jira_tickets"
-        - "Нажать Create Monitoring Case"
-      expected: "Кейс создан без ошибок (нет 400/422/500)"
+        - "Navigate to Create Monitoring Case tab"
+        - "Fill required fields: title, user_uids (UUID), abuse_type, process, severity, description, jira_tickets"
+        - "Click 'Create Monitoring Case'"
+      expected: "Case created without errors (no 400/422/500)"
       priority: P0
       validation_rules:
-        - "title: обязательное"
-        - "user_uids: обязательное, формат UUID"
-        - "abuse_type: обязательное, выбор из списка"
-        - "process: обязательное, выбор из списка"
-        - "severity: обязательное (low/medium/high/critical)"
-        - "description: обязательное"
-        - "jira_tickets: обязательное"
-        - "Если severity=critical: link обязателен + files обязательны"
+        - "title: required"
+        - "user_uids: required, UUID format"
+        - "abuse_type: required, select from list"
+        - "process: required, select from list"
+        - "severity: required (low/medium/high/critical)"
+        - "description: required"
+        - "jira_tickets: required"
+        - "If severity=critical: link required + files required"
 
-    - id: TC-UI-04
-      name: "Создание Reporting Case"
-      tab: Create Reporting Case
-      actions:
-        - "Перейти на вкладку Create Reporting Case"
-        - "Заполнить: user_uids, abuse_type, symbol, severity, description"
-        - "Если severity != critical: приложить файл + выбрать suspicious_timeframe"
-        - "Если severity = critical: заполнить link (файл НЕ нужен)"
-        - "Нажать Create Reporting Case"
-      expected: "Кейс создан без ошибок"
-      priority: P0
-      validation_rules:
-        - "user_uids: обязательное, формат UUID"
-        - "abuse_type: обязательное"
-        - "symbol: обязательное"
-        - "severity: обязательное"
-        - "description: обязательное"
-        - "severity != critical → files + suspicious_timeframe обязательны"
-        - "severity = critical → link обязателен, files НЕ нужны"
-
-    - id: TC-UI-05
-      name: "Просмотр деталей кейса"
-      tab: Cases
-      preconditions: "Есть кейсы в таблице"
-      actions:
-        - "Кликнуть на ID кейса в таблице"
-        - "Проверить что открылся диалог с полями"
-      expected: "Диалог деталей открыт, видны все поля кейса"
-      priority: P0
-
-    - id: TC-UI-06
-      name: "Редактирование кейса"
-      tab: Cases
-      preconditions: "Открыт диалог деталей (TC-UI-05)"
-      actions:
-        - "Изменить description"
-        - "Изменить abuse_type (через dropdown)"
-        - "Изменить investigation_outcome"
-        - "Нажать Save"
-      expected: "Изменения сохранены без ошибок"
-      priority: P0
-
-    - id: TC-UI-07
-      name: "Статусный flow: new → in_progress → closed → reopen"
-      tab: Cases
-      preconditions: "Есть кейс в статусе new"
-      actions:
-        - "Открыть кейс → сменить статус на In Progress"
-        - "Сменить статус на Closed → подтвердить в диалоге"
-        - "Найти закрытый кейс (добавить Closed в фильтр!) → нажать Reopen"
-      expected: "Каждый переход без ошибок, статус обновляется"
-      priority: P1
-      edge_cases:
-        - "Закрытые кейсы не видны в поиске по умолчанию — нужно добавить 'Closed' в фильтр caseStatuses"
-        - "Закрытие и переоткрытие требуют подтверждения (диалог Yes/Confirm)"
-
-    - id: TC-UI-08
-      name: "Загрузка файла + доставка в Slack"
-      tab: Create Reporting Case
-      preconditions: "Запущен daemon slack-sync"
-      actions:
-        - "Создать reporting case с файлом (severity=medium)"
-        - "Проверить файл в деталях кейса"
-        - "Проверить что файл появился в Slack-треде кейса"
-      expected: "Файл виден в UI и доставлен в Slack (< 30 сек)"
-      priority: P1
-      integrations:
-        - "MinIO: файл сохраняется в cases/{id}/"
-        - "Slack: файл отправляется в тред кейса через EventCaseScreenshotAdded"
-
-    - id: TC-UI-09
-      name: "Комментарии и логи"
-      tab: Cases
-      preconditions: "Открыт диалог деталей кейса"
-      actions:
-        - "Добавить комментарий"
-        - "Переключить на Logs"
-        - "Проверить загрузку логов"
-      expected: "Комментарий сохранён, логи загружены"
-      priority: P1
-
-    - id: TC-UI-10
-      name: "Suspects — поиск и детали"
-      tab: Suspects
-      actions:
-        - "Отключить фильтры has_updates и openOnly"
-        - "Нажать Search"
-        - "Проверить колонки: UID, Country, Cases, Client Profit, Black Flags, Abuse Ratio"
-        - "Кликнуть на UUID → проверить детали подозреваемого"
-        - "Проверить внешние ссылки: Backoffice, Restrictions, Toxicity, Ticks"
-      expected: "Таблица загружена, детали видны, все ссылки присутствуют"
-      priority: P1
-
-    - id: TC-UI-11
-      name: "Dashboard"
-      tab: Dashboard
-      actions:
-        - "Открыть Dashboard"
-        - "Нажать FILTER"
-        - "Проверить наличие графиков (Highcharts)"
-        - "Проверить статистику (Total cases, Total suspects)"
-        - "Проверить фильтры: Process, Severity, Investigation Outcome, Country Code"
-      expected: "Графики рендерятся, статистика видна, фильтры доступны"
-      priority: P2
-
-    - id: TC-UI-12
-      name: "Settings — процессы"
-      tab: Settings
-      actions:
-        - "Открыть Settings"
-        - "Проверить таблицу процессов (колонки: Name, Process name)"
-        - "Кликнуть Edit на первом процессе"
-        - "Проверить что появился inline input"
-      expected: "Таблица загружена, inline-редактирование активируется"
-      priority: P2
-
-    - id: TC-UI-13
-      name: "Навигация PREV/NEXT"
-      tab: Cases
-      preconditions: "Открыт диалог деталей кейса, есть несколько кейсов"
-      actions:
-        - "Нажать NEXT"
-        - "Нажать PREV"
-      expected: "Навигация между кейсами работает без ошибок"
-      priority: P2
-
-    - id: TC-UI-14
-      name: "Reporter и Assignee"
-      tab: Cases
-      actions:
-        - "Открыть таблицу кейсов"
-        - "Проверить что нет значений 'unknown' в колонках Reporter, Assignee, Updated By"
-      expected: "Все значения разрезолвлены (не 'unknown')"
-      priority: P2
-      known_bugs:
-        - "Reporter/Assignee могли отображаться как 'unknown' — баг, сейчас исправлен"
-
-  # ─── API (будущие тесты) ──────────────
   # api:
   #   - id: TC-API-01
-  #     name: "POST /api/cases/manage — создание кейса"
+  #     name: "POST /api/cases/manage — create case"
   #     method: POST
   #     endpoint: /api/cases/manage
-  #     body: { ... }
   #     expected_status: 200
-  #     expected_body: { "message": "case saved successfully" }
 
-  # ─── Валидация (будущие тесты) ────────
   # validation:
   #   - id: TC-VAL-01
-  #     name: "Невалидный UUID отклоняется"
-  #     actions: "Ввести 'not-a-uuid' в user_uids → submit"
+  #     name: "Invalid UUID rejected"
+  #     actions: "Enter 'not-a-uuid' in user_uids → submit"
   #     expected: "422 Validation Error"
 
-# Особенности UI (важно для написания автотестов)
+# UI specifics (important for writing automated tests)
 ui_specifics:
   framework: "Backoffice (schema-driven, CSS Modules)"
   selector_patterns:
@@ -306,53 +165,53 @@ ui_specifics:
     file_input: '[class*="FileInput"]'
     switches: 'label (sibling of hidden checkbox input)'
   gotchas:
-    - "Custom Select: клик на input с force=True → ждать button.ListItem_item → кликнуть"
-    - "DatePicker: НЕ использовать fill(), кликать пресеты (Last 30 days)"
-    - "Submit кнопки: всегда scope через [class*='Button_button'], иначе зацепит табы"
-    - "Тосты/нотификации могут перекрывать элементы — нужна retry-логика"
-    - "Закрытые кейсы не видны в дефолтном поиске — добавить Closed в фильтр"
+    - "Custom Select: click input with force=True → wait for button.ListItem_item → click"
+    - "DatePicker: do NOT use fill(), click presets (e.g. 'Last 30 days')"
+    - "Submit buttons: always scope via [class*='Button_button'] to avoid matching tabs"
+    - "Toast notifications may block clicks — retry logic needed"
+    - "Closed cases hidden from default search — add 'Closed' to caseStatuses filter"
 ```
 
 ---
 
-## Секция `ui_elements` — ОБЯЗАТЕЛЬНАЯ сверка с реальным UI
+## `ui_elements` section — MANDATORY UI verification
 
-Самая частая причина провала тестов — **несовпадение текстов кнопок, типов полей и названий колонок** между описанием и реальным UI. Описание из кода или документации часто расходится с тем, что рендерится на экране.
+The most common cause of test failures is **mismatch between button texts, field types, and column names** in the description vs the actual UI. Code-based or documentation-based descriptions often diverge from what renders on screen.
 
-### Что нужно сверить (открыть страницу в браузере и записать ТОЧНО):
+### What to verify (open the page in browser and record EXACTLY):
 
-| Элемент | Что записать | Частые ошибки |
-|---------|-------------|---------------|
-| **Кнопка submit** | Точный текст: "CREATE REPORT", не "Generate", не "RUN" | Текст из кода vs реальный текст на кнопке |
-| **Поля формы** | Тип (textarea / dropdown / date picker / input) + placeholder | Dropdown путают с date picker |
-| **Колонки таблицы** | Точные заголовки из `<thead>` | Колонки без текста (иконки, действия) |
-| **Кнопки действий** | Точные тексты: "Download", "Fill out", "GDrive" | "GDrive" vs "Google Drive Upload" |
-| **Пустое состояние** | Текст при отсутствии данных: "No data found" | — |
-| **Формат данных** | Дата: "Apr 02 2026, 11:33:32 AM" | — |
+| Element | What to record | Common mistakes |
+|---------|---------------|-----------------|
+| **Submit button** | Exact text: "CREATE REPORT", not "Generate", not "RUN" | Text from code vs actual button text |
+| **Form fields** | Type (textarea / dropdown / date picker / input) + placeholder | Dropdown confused with date picker |
+| **Table columns** | Exact headers from `<thead>` | Columns without text (icons, actions) |
+| **Action buttons** | Exact texts: "Download", "Fill out", "GDrive" | "GDrive" vs "Google Drive Upload" |
+| **Empty state** | Text when no data: "No data found" | — |
+| **Data format** | Date: "Apr 02 2026, 11:33:32 AM" | — |
 
-### Формат секции `ui_elements`:
+### `ui_elements` format:
 
 ```yaml
 ui_elements:
   page:
-    title: "LTHVC Check"                     # H1 заголовок — ТОЧНЫЙ текст
+    title: "LTHVC Check"                     # H1 heading — EXACT text
   form:
     fields:
       - name: "UUIDs"
-        label: "UUIDs (up to 25000)"         # placeholder — ТОЧНЫЙ текст
+        label: "UUIDs (up to 25000)"         # placeholder — EXACT text
         type: textarea                       # textarea | select_dropdown | date_picker | text_input
       - name: "ScoringDate"
         label: "Scoring date"
-        type: select_dropdown                # НЕ date_picker!
+        type: select_dropdown                # NOT date_picker!
     submit_button:
-      text: "CREATE REPORT"                  # ТОЧНЫЙ текст кнопки
+      text: "CREATE REPORT"                  # EXACT button text
   report_log:
     table:
-      columns: ["ID", "Date", "Client"]      # ТОЧНЫЕ заголовки
-      total_columns: 7                       # включая безымянные
+      columns: ["ID", "Date", "Client"]      # EXACT headers
+      total_columns: 7                       # including unnamed columns
     empty_state: "No data found"
   report_detail_dialog:
-    action_buttons:                           # ТОЧНЫЕ тексты кнопок
+    action_buttons:                           # EXACT button texts
       - "Fill out"
       - "Copy"
       - "Repeat"
@@ -361,146 +220,267 @@ ui_elements:
       - "GDrive"
 ```
 
-### Как сверять:
-1. Открыть страницу в браузере
-2. Для каждого элемента — скопировать текст как есть
-3. Тип поля — кликнуть и посмотреть: открывается календарь (date_picker), выпадающий список (select_dropdown) или просто текстовое поле
-4. Колонки — посмотреть `<thead>`, записать только непустые заголовки + общее количество `<th>`
-5. Кнопки действий — открыть диалог/строку, записать все видимые тексты кнопок
+### How to verify:
+1. Open the page in browser
+2. For each element — copy the text as-is
+3. Field type — click and observe: calendar opens (date_picker), dropdown list (select_dropdown), or plain text field
+4. Columns — inspect `<thead>`, record non-empty headers + total `<th>` count
+5. Action buttons — open dialog/row, record all visible button texts
 
 ---
 
-## Формат описания тест-кейса
+## Test case format
 
-Каждый кейс должен содержать:
+Each test case must contain:
 
-| Поле | Обязательное | Описание |
-|------|:---:|----------|
-| `id` | да | Уникальный ID: TC-UI-01, TC-API-01, TC-VAL-01 |
-| `name` | да | Короткое название на русском или английском |
-| `tab` / `endpoint` | да | Для UI — вкладка, для API — endpoint |
-| `actions` | да | Список шагов (что делать) |
-| `expected` | да | Ожидаемый результат |
-| `priority` | да | P0 — нельзя работать, P1 — основной flow, P2 — второстепенное |
-| `preconditions` | нет | Что должно быть подготовлено |
-| `validation_rules` | нет | Правила валидации полей |
-| `edge_cases` | нет | Граничные случаи |
-| `integrations` | нет | Внешние системы (Slack, MinIO, Kafka...) |
-| `known_bugs` | нет | Известные баги |
+| Field | Required | Description |
+|-------|:---:|-------------|
+| `id` | yes | Unique ID: TC-UI-01, TC-API-01, TC-VAL-01 |
+| `name` | yes | Short name **in English** |
+| `tab` / `endpoint` | yes | For UI — tab name, for API — endpoint |
+| `actions` | yes | Step-by-step actions **in English** |
+| `expected` | yes | Expected result **in English** |
+| `priority` | yes | P0 — blocking, P1 — main flow, P2 — secondary |
+| `preconditions` | no | What must be prepared |
+| `validation_rules` | no | Field validation rules |
+| `edge_cases` | no | Edge cases |
+| `integrations` | no | External systems (Slack, MinIO, Kafka...) |
+| `known_bugs` | no | Known bugs |
 
 ---
 
-## Уровень детализации
+## Level of detail
 
-### Хорошо — точные тексты + бизнес-логика:
+### How detailed should test cases be?
+
+**Very detailed.** TITAN is an AI-driven automation tool, not a human QA engineer. It cannot guess business logic, validation rules, or expected behavior from context. Every test case must be explicit and self-contained.
+
+**The rule: if someone who has never seen your service reads the test case, they must understand exactly what to do and what to expect.**
+
+Each test case should describe:
+
+1. **Every field in the form** — name, type, whether required or optional, valid/invalid values, default value
+2. **Every button** — exact text as displayed on screen (case-sensitive!)
+3. **Every dropdown option** — all available values listed explicitly
+4. **Every validation rule** — what happens when input is invalid, what error message appears
+5. **Every state transition** — from → to, what triggers it, what confirmation is needed
+6. **Every edge case** — what changes when severity=critical vs medium, what happens with empty input, what happens at boundaries (max length, min date)
+7. **Every integration** — what external system is affected (Slack, MinIO, Kafka), what to verify there
+8. **Every table column** — exact header text, data format, sort order
+9. **Every dialog/modal** — what triggers it, what buttons are inside, what happens on close
+10. **Every error scenario** — invalid UUID, missing required field, network error, timeout
+
+### What "too vague" looks like and why it fails:
+
+| Vague description | Why TITAN can't work with it | What to write instead |
+|---|---|---|
+| "Fill the form" | Which fields? What values? | "Fill: title='Test', user_uids='<valid UUID>', abuse_type=select 'Arbitrage', severity=select 'Medium'" |
+| "Submit" | Which button? What text? | "Click 'CREATE REPORT' button" |
+| "Check the table" | Which columns? What data? How many rows? | "Verify table has columns: ID, Date, Client. Verify at least 1 row. Verify newest row has status '✓'" |
+| "It should work" | What does "work" mean? | "No 400/422/500 errors. New row appears in Report Log. Status changes to 'processing' within 5 sec" |
+| "Test validation" | Which field? What input? What error? | "Enter 'not-a-uuid' in UUIDs field → click 'CREATE REPORT' → expect 422 error with message 'invalid uuids not-a-uuid'" |
+| "Test all statuses" | Which statuses? What transitions? What order? | "new → in_progress (click Status dropdown, select 'In Progress'). in_progress → closed (select 'Closed', confirm in Yes/No dialog). closed → in_progress (add 'Closed' to filter, find case, click 'Reopen', confirm)" |
+
+### Minimum required detail per field:
+
+```yaml
+fields:
+  - name: "UUIDs"                              # field name attribute
+    label: "UUIDs (up to 6000)"                # exact placeholder/label text
+    type: textarea                             # textarea | text_input | select_dropdown | date_picker | date_range_picker | checkbox | file_upload
+    required: false                            # true | false
+    default: ""                                # default value if any
+    max_length: 6000                           # max input length
+    validation: "uuid.Parse() per UUID"        # validation logic
+    valid_example: "550e8400-e29b-41d4-a716-446655440000"  # example valid input
+    invalid_example: "not-a-uuid"              # example invalid input
+    error_message: "invalid uuids {value}"     # exact error text
+    delimiter: "newline or comma"              # for multi-value fields
+    notes: "UUIDs are deduplicated and sorted" # any special behavior
+
+  - name: "Status"
+    label: "Status"
+    type: select_dropdown
+    required: false
+    default: "All"
+    options:                                   # ALL available options listed
+      - "All"
+      - "Enabled"
+      - "Disabled"
+    notes: "Affects which users appear in results"
+
+  - name: "ScoringDate"
+    label: "Scoring date"
+    type: select_dropdown                      # NOT date_picker!
+    required: false
+    default: "yesterday (UTC)"
+    min_value: "2021-01-01"
+    notes: "Dropdown with predefined dates, not a calendar"
+```
+
+### Minimum required detail per test case:
+
+```yaml
+- id: TC-UI-07
+  name: "Status flow: new → in_progress → closed → reopen"
+  preconditions:
+    - "At least 1 case exists in status 'new'"
+    - "daemon slack-sync is running (for Slack notifications)"
+  actions:
+    - "Open case detail dialog (click case ID in table)"
+    - "Scroll to Status field"
+    - "Click Status dropdown (input[name='status'], force click)"
+    - "Select 'In Progress' from dropdown options"
+    - "Wait 2 sec for API response"
+    - "Verify: no 400/422/500 errors, status updated"
+    - "Click Status dropdown again"
+    - "Select 'Closed'"
+    - "Confirmation dialog appears with 'Yes'/'No' buttons"
+    - "Click 'Yes' to confirm"
+    - "Verify: case status is now 'closed'"
+    - "Go to Cases tab, add 'Closed' to caseStatuses filter (closed cases are HIDDEN by default!)"
+    - "Click Search"
+    - "Find the closed case in results"
+    - "Open case detail"
+    - "Click 'Reopen' button"
+    - "Confirmation dialog appears"
+    - "Click 'Yes'"
+    - "Verify: case status is now 'in_progress'"
+  expected: "All 3 transitions succeed without errors. Each status change reflected in UI immediately."
+  priority: P1
+  edge_cases:
+    - "Closed cases are NOT visible in default search — filter must include 'Closed' status"
+    - "Both close and reopen require confirmation dialog (Yes/No)"
+    - "Status dropdown uses custom Select component — requires force click on input"
+  integrations:
+    - "Slack: status change events sent to case thread"
+  known_bugs:
+    - "Previously status dropdown was not scrollable — fixed in v2.3"
+```
+
+### Good — exact texts + business logic:
 ```yaml
 - id: TC-UI-02
-  name: "Отправка пустой формы"
+  name: "Submit empty form"
   actions:
-    - "Оставить все поля пустыми"
-    - "Нажать 'CREATE REPORT'"              # ← ТОЧНЫЙ текст кнопки с экрана
-    - "Дождаться ответа (3-5 сек)"
-  expected: "Отчёт создан, новая строка в таблице Report Log"
+    - "Leave all fields empty"
+    - "Click 'CREATE REPORT'"              # ← EXACT button text from screen
+    - "Wait for response (3-5 sec)"
+  expected: "Report created, new row in Report Log table"
   validation_rules:
     - "UUIDs: required=false"
-    - "ScoringDate: required=false, по умолчанию = вчера"
+    - "ScoringDate: required=false, defaults to yesterday"
 ```
 
-### Хорошо — edge cases описаны:
+### Good — edge cases described:
 ```yaml
 - id: TC-UI-04
-  name: "Создание Reporting Case"
+  name: "Create Reporting Case"
   actions:
-    - "Заполнить user_uids (UUID формат)"
-    - "Выбрать abuse_type из dropdown"
+    - "Fill user_uids (UUID format)"
+    - "Select abuse_type from dropdown"
     - "Severity = Medium"
-    - "Приложить файл (обязательно для non-critical)"
-    - "Нажать 'CREATE REPORTING CASE'"       # ← ТОЧНЫЙ текст кнопки
-  expected: "201/200, кейс появляется в таблице"
+    - "Attach file (required for non-critical)"
+    - "Click 'CREATE REPORTING CASE'"       # ← EXACT button text
+  expected: "201/200, case appears in table"
   validation_rules:
-    - "severity=critical → link обязателен, файл НЕ нужен"
-    - "severity!=critical → файл + timeframe обязательны"
+    - "severity=critical → link required, file NOT needed"
+    - "severity!=critical → file + timeframe required"
 ```
 
-### Плохо — неточные тексты кнопок:
+### Bad — wrong button texts:
 ```yaml
 - id: TC-UI-02
-  name: "Отправка формы"
+  name: "Submit form"
   actions:
-    - "Нажать 'Submit'"                      # ← НЕПРАВИЛЬНО! Реальный текст: "CREATE REPORT"
-    - "Нажать 'Generate'"                    # ← НЕПРАВИЛЬНО! Такой кнопки нет
-  expected: "Отчёт создан"
+    - "Click 'Submit'"                      # ← WRONG! Actual text: "CREATE REPORT"
+    - "Click 'Generate'"                    # ← WRONG! No such button
+  expected: "Report created"
 ```
-**Результат: тесты провалятся — кнопка не найдена, timeout 30 сек на каждый тест.**
+**Result: tests will fail — button not found, 30 sec timeout per test.**
 
-### Плохо — неправильный тип поля:
+### Bad — wrong field type:
 ```yaml
 fields:
   - name: "ScoringDate"
-    type: date_picker                        # ← НЕПРАВИЛЬНО! Реально это select_dropdown
+    type: date_picker                        # ← WRONG! Actually select_dropdown
 ```
-**Результат: тест будет искать календарь, а его нет.**
+**Result: test will look for a calendar that doesn't exist.**
 
-### Плохо — слишком размыто:
+### Bad — too vague:
 ```yaml
 - id: TC-01
-  name: "Создание отчёта"
-  actions: "Создать отчёт"
-  expected: "Отчёт создан"
+  name: "Create report"
+  actions: "Create report"
+  expected: "Report created"
 ```
 
-### Плохо — CSS-селекторы (не нужно):
+### Bad — CSS selectors (not needed):
 ```yaml
 - id: TC-01
   actions:
-    - "Кликнуть на button[class*='Button_button']:has-text('CREATE REPORT')"
-    - "Подождать 500мс"
+    - "Click button[class*='Button_button']:has-text('CREATE REPORT')"
+    - "Wait 500ms"
 ```
-Селекторы и тайминги — задача TITAN, не мастера сервиса.
+Selectors and timings are TITAN's job, not the service owner's.
 
 ---
 
-## Что TITAN сделает сам
+## What TITAN handles automatically
 
-Вам **НЕ нужно** описывать:
-- CSS-селекторы
-- Тайминги и ожидания
-- Как работать с кастомными компонентами (dropdown, datepicker)
-- Как делать скриншоты
-- Как анализировать ошибки
+You do **NOT** need to describe:
+- CSS selectors
+- Timings and waits
+- How to interact with custom components (dropdown, datepicker)
+- How to take screenshots
+- How to analyze errors
 
-Вам **НУЖНО** описать:
-- Какие поля обязательные и когда
-- Какие есть edge cases (critical severity → другие правила)
-- Какие интеграции проверять (файл → Slack)
-- Какие баги известны
-- В каком порядке выполнять (статус: new → in_progress → closed)
-
----
-
-## Типы тестов
-
-| Тип | Префикс | Что тестирует | Пример |
-|-----|---------|---------------|--------|
-| UI | TC-UI | Интерфейс: формы, таблицы, навигация | Создание кейса через форму |
-| API | TC-API | REST endpoints напрямую | POST /api/cases/manage |
-| Validation | TC-VAL | Валидация входных данных | Невалидный UUID → 422 |
-| Integration | TC-INT | Связь между системами | Файл → MinIO → Slack |
-| Regression | TC-REG | Visual regression скриншоты | Страница не изменилась vs baseline |
+You **DO** need to describe:
+- Which fields are required and when
+- What edge cases exist (critical severity → different rules)
+- Which integrations to verify (file → Slack)
+- Known bugs
+- Execution order (status: new → in_progress → closed)
 
 ---
 
-## Checklist перед передачей в TITAN
+## Test types
 
-- [ ] Папка `testMe/` создана в корне репозитория
-- [ ] `testMe/howTestMe.yaml` заполнен
-- [ ] Указан git-репозиторий или локальный путь к исходному коду
-- [ ] Описаны ВСЕ тест-кейсы (минимум P0 и P1)
-- [ ] Указаны правила валидации для каждой формы
-- [ ] Описаны edge cases (разное поведение в зависимости от условий)
-- [ ] Указаны интеграции (Slack, MinIO, Kafka, etc.)
-- [ ] Указаны известные баги
-- [ ] Есть рабочий инстанс + credentials для всех ролей
-- [ ] Описаны зависимости (какие сервисы/демоны должны работать)
-- [ ] Тестовые файлы (fixtures) положены в `testMe/fixtures/`
-- [ ] Доп. документация (валидация, статусы, интеграции) в `testMe/docs/`
+| Type | Prefix | What it tests | Example |
+|------|--------|---------------|---------|
+| UI | TC-UI | Interface: forms, tables, navigation | Create case via form |
+| API | TC-API | REST endpoints directly | POST /api/cases/manage |
+| Validation | TC-VAL | Input validation | Invalid UUID → 422 |
+| Integration | TC-INT | Cross-system communication | File → MinIO → Slack |
+| Regression | TC-REG | Visual regression screenshots | Page unchanged vs baseline |
+
+---
+
+## Language requirement
+
+**All content in `testMe/` must be in English:**
+- `howTestMe.yaml` — test case names, descriptions, actions, expected results
+- `ui_test_scenarios.py` — class names, method names, docstrings, comments, print messages
+- `docs/*.md` — all documentation
+- `fixtures/` — file names
+
+This is a hard requirement. PRs with non-English text in `testMe/` will be rejected.
+
+---
+
+## Checklist before submitting to TITAN
+
+- [ ] `testMe/` folder created in repository root
+- [ ] `testMe/howTestMe.yaml` filled out **in English**
+- [ ] `testMe/ui_test_scenarios.py` created **in English**
+- [ ] Git repository or local path to source code specified
+- [ ] ALL test cases described (at minimum P0 and P1)
+- [ ] Validation rules specified for each form
+- [ ] Edge cases described (different behavior depending on conditions)
+- [ ] Integrations specified (Slack, MinIO, Kafka, etc.)
+- [ ] Known bugs listed
+- [ ] Working instance + credentials for all roles available
+- [ ] Dependencies described (which services/daemons must be running)
+- [ ] Test fixtures placed in `testMe/fixtures/`
+- [ ] Additional docs (validation, statuses, integrations) in `testMe/docs/`
+- [ ] **All text is in English — no Russian or other languages**

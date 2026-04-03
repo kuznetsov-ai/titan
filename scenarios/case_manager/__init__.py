@@ -6,6 +6,7 @@ from scenarios.base import BaseScenario, StepResult
 from scenarios.case_manager.cases import CasesMixin
 from scenarios.case_manager.dashboard import DashboardMixin
 from scenarios.case_manager.files import FilesMixin
+from scenarios.case_manager.helpers import CaseManagerHelpersMixin
 from scenarios.case_manager.selectors import SEL as SEL  # re-export
 from scenarios.case_manager.settings import SettingsMixin
 from scenarios.case_manager.setup import SetupMixin
@@ -13,14 +14,15 @@ from scenarios.case_manager.suspects import SuspectsMixin
 
 
 class CaseManagerScenarios(
+    CaseManagerHelpersMixin,
     SetupMixin, CasesMixin, SuspectsMixin,
     DashboardMixin, SettingsMixin, FilesMixin,
     BaseScenario,
 ):
     OUTPUT_SUBDIR = "case-manager"
 
-    async def run_all(self, only: list[str] | None = None) -> list[StepResult]:
-        """Run Case Manager scenarios. If only is set, run only matching tests."""
+    async def run_all(self, only: list[str] | None = None, random_n: int | None = None) -> list[StepResult]:
+        """Run Case Manager scenarios. If only is set, run only matching. If random_n, pick N random."""
         scenarios = [
             # Setup — create test data first
             self.setup_test_data,
@@ -73,6 +75,12 @@ class CaseManagerScenarios(
                         return True
                 return False
             scenarios = [s for s in scenarios if _matches(s)]
+
+        if random_n and random_n > 0:
+            import random
+            random_n = min(random_n, len(scenarios))
+            scenarios = random.sample(scenarios, random_n)
+            print(f"    [RANDOM] Selected {random_n} scenarios: {[s.__name__ for s in scenarios]}")
 
         for scenario in scenarios:
             print(f"    Running: {scenario.__doc__}")

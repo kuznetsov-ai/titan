@@ -1,9 +1,9 @@
-"""Tests for the multi-provider AI client."""
+"""Tests for the async multi-provider AI client."""
 
 from __future__ import annotations
 
-import subprocess
-from unittest.mock import MagicMock, patch
+import asyncio
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -17,6 +17,11 @@ def _reset_global_config():
     client._config = None
     yield
     client._config = None
+
+
+def _run(coro):
+    """Helper to run async function in sync test."""
+    return asyncio.get_event_loop().run_until_complete(coro)
 
 
 # ── Configuration tests ───────────────────────────────────────
@@ -43,25 +48,15 @@ def test_configure_sets_global():
 # ── Provider dispatch tests ──────────────────────────────────
 
 
-def test_claude_cli_provider(monkeypatch):
-    """provider='claude_cli' calls subprocess.run."""
+def test_claude_cli_provider():
+    """provider='claude_cli' calls async subprocess."""
     client.configure(AIConfig(provider="claude_cli", model="sonnet"))
 
-    fake_result = subprocess.CompletedProcess(
-        args=["claude", "--print", "--model", "sonnet"],
-        returncode=0,
-        stdout="  CLI response text  ",
-        stderr="",
-    )
-    mock_run = MagicMock(return_value=fake_result)
-    monkeypatch.setattr(subprocess, "run", mock_run)
+    mock_cli = AsyncMock(return_value="CLI response text")
+    with patch.object(client, "_call_claude_cli", mock_cli):
+        result = _run(client.ask_vision("describe the page"))
 
-    result = client.ask_vision("describe the page")
-
-    mock_run.assert_called_once()
-    call_kwargs = mock_run.call_args
-    assert call_kwargs[0][0] == ["claude", "--print", "--model", "sonnet"]
-    assert "describe the page" in call_kwargs[1]["input"]
+    mock_cli.assert_called_once()
     assert result == "CLI response text"
 
 
@@ -71,7 +66,7 @@ def test_anthropic_provider_no_key(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
     with pytest.raises(ValueError, match="Anthropic provider requires api_key"):
-        client.ask_vision("test prompt")
+        _run(client.ask_vision("test prompt"))
 
 
 def test_openai_provider_no_base():
@@ -79,7 +74,7 @@ def test_openai_provider_no_base():
     client.configure(AIConfig(provider="openai_compatible", model="gpt-4", api_base=None))
 
     with pytest.raises(ValueError, match="openai_compatible provider requires api_base"):
-        client.ask_vision("test prompt")
+        _run(client.ask_vision("test prompt"))
 
 
 def test_unknown_provider():
@@ -87,7 +82,7 @@ def test_unknown_provider():
     client.configure(AIConfig(provider="gpt4all", model="anything"))
 
     with pytest.raises(ValueError, match="Unknown AI provider.*gpt4all.*Supported"):
-        client.ask_vision("test prompt")
+        _run(client.ask_vision("test prompt"))
 
 
 # ── ask_vision_json parsing tests ────────────────────────────
@@ -95,33 +90,33 @@ def test_unknown_provider():
 
 def test_ask_vision_json_parses_json():
     """Mock ask_vision to return clean JSON -> parsed dict."""
-    raw = '{"key": "value"}'
-    with patch.object(client, "ask_vision", return_value=raw):
-        result = client.ask_vision_json("get json")
+    mock_vision = AsyncMock(return_value='{"key": "value"}')
+    with patch.object(client, "ask_vision", mock_vision):
+        result = _run(client.ask_vision_json("get json"))
     assert result == {"key": "value"}
 
 
 def test_ask_vision_json_strips_markdown():
     """Mock ask_vision to return markdown-fenced JSON -> parsed."""
-    raw = '```json\n{"key": "val"}\n```'
-    with patch.object(client, "ask_vision", return_value=raw):
-        result = client.ask_vision_json("get json")
+    mock_vision = AsyncMock(return_value='```json\n{"key": "val"}\n```')
+    with patch.object(client, "ask_vision", mock_vision):
+        result = _run(client.ask_vision_json("get json"))
     assert result == {"key": "val"}
 
 
 def test_ask_vision_json_finds_json_in_text():
     """Mock ask_vision to return JSON embedded in text -> parsed."""
-    raw = 'Here is the result: {"key": "val"} done'
-    with patch.object(client, "ask_vision", return_value=raw):
-        result = client.ask_vision_json("get json")
+    mock_vision = AsyncMock(return_value='Here is the result: {"key": "val"} done')
+    with patch.object(client, "ask_vision", mock_vision):
+        result = _run(client.ask_vision_json("get json"))
     assert result == {"key": "val"}
 
 
 def test_ask_vision_json_parse_failure():
     """Mock ask_vision to return non-JSON -> dict with _error key."""
-    raw = "not json at all"
-    with patch.object(client, "ask_vision", return_value=raw):
-        result = client.ask_vision_json("get json")
+    mock_vision = AsyncMock(return_value="not json at all")
+    with patch.object(client, "ask_vision", mock_vision):
+        result = _run(client.ask_vision_json("get json"))
     assert "_error" in result
     assert "_raw" in result
-    assert result["_raw"] == raw
+    assert result["_raw"] == "not json at all"

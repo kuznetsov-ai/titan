@@ -47,7 +47,7 @@ Rules:
 Respond ONLY with the JSON, no markdown fences."""
 
 
-def compare_screenshots(
+async def compare_screenshots(
     baseline_path: str | Path,
     current_path: str | Path,
     page_url: str,
@@ -59,7 +59,7 @@ def compare_screenshots(
     """Compare baseline and current screenshots using AI Vision."""
     prompt = f"BASELINE screenshot (first image), then CURRENT screenshot (second image).\n\n{DIFF_PROMPT}"
 
-    data = ask_vision_json(
+    data = await ask_vision_json(
         prompt,
         image_paths=[baseline_path, current_path],
     )

@@ -25,6 +25,9 @@ Examples:
 
   # E2E with visible browser
   titan test --system config/systems/backoffice.yaml --scenario case-manager --headed
+
+  # Run 5 random scenarios from EXD test plan
+  titan test --system config/systems/backoffice.yaml --scenario exd --random 5 --headed
         """,
     )
 
@@ -42,6 +45,7 @@ Examples:
     test_parser.add_argument("--system", "-s", required=True, help="Path to system YAML config")
     test_parser.add_argument("--scenario", required=True, help="Scenario: case-manager | lthvc-check | exd")
     test_parser.add_argument("--only", nargs="+", help="Run only these test names (e.g. --only S21 S13)")
+    test_parser.add_argument("--random", type=int, metavar="N", help="Run N random scenarios from the test plan")
     test_parser.add_argument("--headed", action="store_true", help="Visible browser")
     test_parser.add_argument("--env", choices=["test", "prod"], help="Override environment")
 
@@ -75,7 +79,8 @@ Examples:
     elif args.command == "test":
         from scenarios.runner import run_scenario
         only = getattr(args, 'only', None)
-        report_path = asyncio.run(run_scenario(config, scenario_name=args.scenario, only=only))
+        random_n = getattr(args, 'random', None)
+        report_path = asyncio.run(run_scenario(config, scenario_name=args.scenario, only=only, random_n=random_n))
         print(f"\nDone! Report saved to: {report_path}")
 
 
