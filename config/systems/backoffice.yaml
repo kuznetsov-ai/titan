@@ -33,10 +33,11 @@ ai:
   depth: deep
 
 external_scenarios:
-  lthvc-check: /Users/evgenii.kuznetsov/Projects/reports/reporting-tool/pkg/reporters/lthvc_check/testMe
-  exd: /Users/evgenii.kuznetsov/Projects/reports/reporting-tool/pkg/reporters/exd/testMe
-  exd-check: /Users/evgenii.kuznetsov/Projects/reports/reporting-tool/pkg/reporters/exd_check/testMe
-  case-manager-v2: /Users/evgenii.kuznetsov/Projects/Case manager/case-manager/testMe
+  # Set your local paths here, e.g.:
+  # lthvc-check: /path/to/reporting-tool/pkg/reporters/lthvc_check/testMe
+  # exd: /path/to/reporting-tool/pkg/reporters/exd/testMe
+  # exd-check: /path/to/reporting-tool/pkg/reporters/exd_check/testMe
+  # case-manager-v2: /path/to/case-manager/testMe
 
 crawl:
   max_pages: 50

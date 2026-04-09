@@ -4,14 +4,14 @@
 service:
   name: case-manager
   repo: git.exness.io/trading-anti-fraud/case-manager
-  local_path: /Users/evgenii.kuznetsov/Projects/Case manager/case-manager
+  local_path: /path/to/case-manager
   type: backoffice
   description: "Управление подозрительными кейсами (monitoring/reporting), suspects, дашборд аналитики"
 
 environment:
   base_url: http://localhost:3000
   setup: |
-    cd /Projects/Case manager/case-manager
+    cd /path/to/case-manager
     docker compose -f docker-compose.bo.yml up -d
     # Запустить отдельно:
     # ./app api backoffice
