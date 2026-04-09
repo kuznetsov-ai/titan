@@ -12,11 +12,11 @@ auth:
 
 roles:
   - name: admin
-    username: admin@home.app
-    password: admin
+    username: ${TITAN_USERNAME:<your-email>}
+    password: ${TITAN_PASSWORD:<your-password>}
   # - name: manager
-  #   username: manager@home.app
-  #   password: manager123
+  #   username: ${TITAN_USERNAME_MANAGER:<manager-email>}
+  #   password: ${TITAN_PASSWORD_MANAGER:<manager-password>}
 
 browser:
   type: chromium  # chromium | firefox | webkit

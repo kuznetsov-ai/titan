@@ -178,8 +178,8 @@ browser:
   ignore_https_errors: {str(ignore_https).lower()}
 roles:
   - name: admin
-    username: admin@test.app
-    password: admin
+    username: user@example.com
+    password: testpass
 """,
             encoding="utf-8",
         )

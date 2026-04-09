@@ -33,8 +33,8 @@ class TestLoadValidYaml:
                 "submit_selector": "#go",
             },
             "roles": [
-                {"name": "admin", "username": "admin@home.app", "password": "admin"},
-                {"name": "viewer", "username": "viewer@home.app", "password": "view"},
+                {"name": "admin", "username": "user@example.com", "password": "testpass"},
+                {"name": "viewer", "username": "viewer@example.com", "password": "testview"},
             ],
             "browser": {
                 "type": "firefox",

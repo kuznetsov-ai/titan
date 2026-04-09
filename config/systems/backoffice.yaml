@@ -11,8 +11,8 @@ auth:
 
 roles:
   - name: admin
-    username: ${TITAN_USERNAME:admin@home.app}
-    password: ${TITAN_PASSWORD:admin}
+    username: ${TITAN_USERNAME:<your-email>}
+    password: ${TITAN_PASSWORD:<your-password>}
 
 browser:
   type: chromium
