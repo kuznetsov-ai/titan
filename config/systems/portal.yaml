@@ -1,0 +1,36 @@
+# Evoca Portal — E2E via testMe/ (see ITQ/Portal/testMe)
+name: portal
+base_url: http://localhost:5173
+environment: test
+
+auth:
+  type: none
+  login_url: /login
+
+roles:
+  - name: employee
+    username: "-"
+    password: "-"
+
+browser:
+  type: chromium
+  headless: true
+  viewport:
+    width: 1440
+    height: 900
+  timeout: 30000
+
+ai:
+  provider: claude_cli
+  model: sonnet
+  depth: deep
+
+external_scenarios:
+  portal: /Users/kuznetsov/Projects/ITQ/Portal/testMe
+
+crawl:
+  max_pages: 50
+  screenshot_delay: 1500
+  ignore_patterns:
+    - "/logout"
+    - "/api/*"

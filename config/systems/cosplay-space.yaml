@@ -1,0 +1,38 @@
+name: cosplay-space
+base_url: https://cosplay-space.live
+environment: prod
+
+auth:
+  type: login_password
+  login_url: /auth/signin
+  username_selector: "input[type='email']"
+  password_selector: "input[type='password']"
+  submit_selector: "button[type='submit']"
+
+roles:
+  - name: user
+    username: ${TITAN_USERNAME:test@cosplay-space.live}
+    password: ${TITAN_PASSWORD:testpassword}
+
+browser:
+  type: chromium
+  headless: true
+  viewport:
+    width: 1440
+    height: 900
+  timeout: 30000
+
+ai:
+  provider: claude_cli
+  model: sonnet
+  depth: deep
+
+external_scenarios:
+  cosplay-space: /Users/kuznetsov/Projects/Personal projects/cosplay-space/testMe
+
+crawl:
+  max_pages: 20
+  screenshot_delay: 1500
+  ignore_patterns:
+    - "/api/*"
+    - "/auth/reset-password*"

@@ -1,0 +1,43 @@
+name: idev-crm
+base_url: http://localhost:3300
+environment: local
+
+# iDev CRM uses BYPASS_AUTH in local dev — no login needed, token is auto-fetched
+# by the frontend store. We still define login selectors as a fallback.
+auth:
+  type: none
+  login_url: /login
+  username_selector: "input[type='email'], input[name='email'], input[placeholder*='mail']"
+  password_selector: "input[type='password']"
+  submit_selector: "button[type='submit'], button:has-text('Войти'), button:has-text('Sign in')"
+
+roles:
+  - name: admin
+    username: admin@idev.team
+    password: ${TITAN_PASSWORD:changeme}
+
+browser:
+  type: chromium
+  headless: true
+  viewport:
+    width: 1440
+    height: 900
+  timeout: 30000
+
+ai:
+  provider: claude_cli
+  model: sonnet
+  depth: deep
+
+external_scenarios:
+  idev-crm: /Users/kuznetsov/Projects/iDev/idev-crm/testMe
+
+crawl:
+  max_pages: 30
+  screenshot_delay: 1500
+  ignore_patterns:
+    - "/logout"
+    - "/api/*"
+  ignore_selectors:
+    - ".timestamp"
+    - "[data-testid='current-time']"

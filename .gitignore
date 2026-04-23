@@ -11,3 +11,5 @@ storage_layout/test_attachment.png
 .pytest_cache/
 CLAUDE.md
 CODE_REVIEW_REPORT.md
+.DS_Store
+docs/superpowers/

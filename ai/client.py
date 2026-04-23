@@ -73,29 +73,37 @@ async def _call_claude_cli(prompt: str, image_paths: list[Path], model: str) -> 
     return stdout.decode().strip()
 
 
-async def _call_anthropic(prompt: str, image_paths: list[Path], model: str, api_key: str) -> str:
-    """Call Anthropic Messages API (async httpx)."""
-    import httpx
+async def _call_anthropic(
+    prompt: str,
+    image_paths: list[Path],
+    model: str,
+    api_key: str,
+    system_prompt: str = "",
+) -> str:
+    """Call Anthropic Messages API via SDK with prompt caching."""
+    import anthropic
+
+    client = anthropic.AsyncAnthropic(api_key=api_key)
 
     images = _build_image_content(image_paths)
-    content = [
+    content: list[dict] = [
         {"type": "image", "source": {"type": "base64", "media_type": img["media_type"], "data": img["data"]}}
         for img in images
     ]
     content.append({"type": "text", "text": prompt})
 
-    async with httpx.AsyncClient(timeout=180) as client:
-        resp = await client.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={"model": model, "max_tokens": 4096, "messages": [{"role": "user", "content": content}]},
-        )
-    resp.raise_for_status()
-    return resp.json()["content"][0]["text"]
+    # Cache system prompt when provided — saves cost/latency on repeated calls
+    system: list[dict] | anthropic.NotGiven = anthropic.NOT_GIVEN
+    if system_prompt:
+        system = [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
+
+    response = await client.messages.create(
+        model=model,
+        max_tokens=4096,
+        system=system,
+        messages=[{"role": "user", "content": content}],
+    )
+    return response.content[0].text
 
 
 async def _call_openai_compatible(prompt: str, image_paths: list[Path],
@@ -126,9 +134,16 @@ async def _call_openai_compatible(prompt: str, image_paths: list[Path],
 async def ask_vision(
     prompt: str,
     image_paths: list[str | Path] | None = None,
+    system_prompt: str = "",
     **kwargs,
 ) -> str:
-    """Send a prompt with optional images to the configured LLM provider (async)."""
+    """Send a prompt with optional images to the configured LLM provider (async).
+
+    Args:
+        system_prompt: When using the anthropic provider, this is cached via
+            cache_control="ephemeral" — repeated calls with the same system_prompt
+            cost ~10% of the first call's input tokens.
+    """
     cfg = _get_config()
     resolved = [Path(p).resolve() for p in (image_paths or [])]
 
@@ -138,7 +153,7 @@ async def ask_vision(
         api_key = cfg.api_key or os.environ.get("ANTHROPIC_API_KEY", "")
         if not api_key:
             raise ValueError("Anthropic provider requires api_key in config or ANTHROPIC_API_KEY env var")
-        return await _call_anthropic(prompt, resolved, cfg.model, api_key)
+        return await _call_anthropic(prompt, resolved, cfg.model, api_key, system_prompt)
     elif cfg.provider == "openai_compatible":
         if not cfg.api_base:
             raise ValueError("openai_compatible provider requires api_base in config")
@@ -151,34 +166,93 @@ async def ask_vision(
         )
 
 
-async def ask_vision_json(
-    prompt: str,
-    image_paths: list[str | Path] | None = None,
-    **kwargs,
-) -> dict:
-    """Send a prompt to the configured LLM and parse JSON response (async)."""
-    raw = await ask_vision(prompt, image_paths, **kwargs)
-
-    # Strip markdown fences if present
+def _extract_json(raw: str) -> dict:
+    """Extract JSON object from LLM response, stripping markdown fences."""
+    raw = raw.strip()
+    # Strip ```json ... ``` or ``` ... ``` fences
     if "```" in raw:
-        parts = raw.split("```")
-        for part in parts:
-            part = part.strip()
-            if part.startswith("json"):
-                part = part[4:].strip()
+        for part in raw.split("```"):
+            part = part.strip().lstrip("json").strip()
             try:
                 return json.loads(part)
             except json.JSONDecodeError:
                 continue
-
+    # Direct parse
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
-        start = raw.find("{")
-        end = raw.rfind("}") + 1
-        if start >= 0 and end > start:
-            try:
-                return json.loads(raw[start:end])
-            except json.JSONDecodeError:
-                pass
-        return {"_raw": raw, "_error": "JSON parse failed"}
+        pass
+    # Last resort: find outermost { }
+    start, end = raw.find("{"), raw.rfind("}") + 1
+    if start >= 0 and end > start:
+        try:
+            return json.loads(raw[start:end])
+        except json.JSONDecodeError:
+            pass
+    return {"_raw": raw, "_error": "JSON parse failed"}
+
+
+async def ask_vision_json(
+    prompt: str,
+    image_paths: list[str | Path] | None = None,
+    system_prompt: str = "",
+    **kwargs,
+) -> dict:
+    """Send a prompt to the configured LLM and parse JSON response (async).
+
+    For Anthropic provider, system_prompt is cached — see ask_vision() docstring.
+    """
+    raw = await ask_vision(prompt, image_paths, system_prompt=system_prompt, **kwargs)
+    return _extract_json(raw)
+
+
+async def ask_structured(
+    prompt: str,
+    schema: type,
+    image_paths: list[str | Path] | None = None,
+    system_prompt: str = "",
+) -> object:
+    """Call Anthropic API and parse response directly into a Pydantic model (async).
+
+    Uses client.messages.parse() — guarantees schema-valid output.
+    Only works with the anthropic provider.
+
+    Args:
+        schema: A Pydantic BaseModel subclass describing the expected output.
+        system_prompt: Cached across repeated calls (cache_control="ephemeral").
+
+    Raises:
+        ImportError: if anthropic SDK is not installed.
+        ValueError: if provider is not anthropic.
+    """
+    import anthropic
+
+    cfg = _get_config()
+    if cfg.provider != "anthropic":
+        raise ValueError(f"ask_structured requires anthropic provider, got {cfg.provider!r}")
+
+    api_key = cfg.api_key or os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise ValueError("Anthropic provider requires api_key in config or ANTHROPIC_API_KEY env var")
+
+    resolved = [Path(p).resolve() for p in (image_paths or [])]
+    images = _build_image_content(resolved)
+    content: list[dict] = [
+        {"type": "image", "source": {"type": "base64", "media_type": img["media_type"], "data": img["data"]}}
+        for img in images
+    ]
+    content.append({"type": "text", "text": prompt})
+
+    system: list[dict] | anthropic.NotGiven = anthropic.NOT_GIVEN
+    if system_prompt:
+        system = [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
+
+    client = anthropic.AsyncAnthropic(api_key=api_key)
+    result = await client.messages.parse(
+        model=cfg.model,
+        max_tokens=4096,
+        system=system,
+        messages=[{"role": "user", "content": content}],
+        response_format=schema,
+    )
+    return result.parsed

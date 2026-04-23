@@ -1,0 +1,40 @@
+name: evoca-crm
+base_url: http://localhost:80
+environment: test
+
+auth:
+  type: login_password
+  login_url: /login
+  username_selector: "input[type='text'], input[name='username'], input[placeholder*='ogin'], input[placeholder*='email']"
+  password_selector: "input[type='password']"
+  submit_selector: "button[type='submit'], button:has-text('Войти'), button:has-text('Sign in'), button:has-text('Login')"
+
+roles:
+  - name: admin
+    username: admin
+    password: ${TITAN_PASSWORD:changeme}
+
+browser:
+  type: chromium
+  headless: false
+  viewport:
+    width: 1440
+    height: 900
+  timeout: 30000
+
+ai:
+  provider: claude_cli
+  model: sonnet
+  depth: deep
+
+external_scenarios:
+  evoca-crm: /Users/kuznetsov/Projects/ITQ/crm/testMe
+
+crawl:
+  max_pages: 50
+  screenshot_delay: 1500
+  ignore_patterns:
+    - "/logout"
+    - "/api/*"
+  ignore_selectors:
+    - ".timestamp"

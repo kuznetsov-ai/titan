@@ -229,6 +229,93 @@ ui_elements:
 
 ---
 
+## `ui_test_scenarios.py` structure
+
+This is where the actual Playwright automation lives. TITAN loads the file
+dynamically at runtime — you do NOT write a separate runner in the titan
+repository; **all scenario code stays inside `testMe/` of the target project.**
+
+### Contract TITAN expects
+
+```python
+# testMe/ui_test_scenarios.py
+from __future__ import annotations
+
+from scenarios.base import BaseScenario, StepResult  # provided by titan
+
+class MyServiceScenarios(BaseScenario):
+    OUTPUT_SUBDIR = "my-service"        # sub-folder for screenshots/artefacts
+    REPORT_URL = "/dashboard"           # initial URL titan navigates to before run
+
+    async def run_all(
+        self,
+        only: list[str] | None = None,
+        random_n: int | None = None,
+    ) -> list[StepResult]:
+        # Map test case IDs → bound methods
+        tests = {
+            "TC-UI-01": self.tc_ui_01_page_load,
+            "TC-UI-02": self.tc_ui_02_create_record,
+            # ...
+        }
+        ids = list(tests)
+        if only:
+            ids = [i for i in ids if i in only]
+        if random_n:
+            import random
+            ids = random.sample(ids, min(random_n, len(ids)))
+        for tid in ids:
+            await tests[tid]()
+        return self.results
+```
+
+### Rules
+
+- **Test IDs must match the IDs in `howTestMe.yaml`.** Titan filters by
+  `--only TC-UI-01 TC-UI-05` and random-samples by ID, so both files stay in sync.
+- **One method per test case.** Method name pattern: `tc_ui_NN_slug`.
+- Every method must call `self._record(name, status, description, screenshot, start)`
+  at least once so titan can produce a report.
+- `BaseScenario` provides helpers: `_step()`, `_screenshot()`, `_record()`,
+  `_click_tab()`, `_fill_field()`, `_select_custom_dropdown()`, `_attach_test_file()`,
+  `_submit_and_check()`, `_close_dialog()`, `_toggle_switch()`.
+- `StepResult.status` must be one of `"PASS"`, `"FAIL"`, `"WARN"`.
+- Do **not** put runner loops, CLI parsing, or system-config code inside
+  `testMe/`. Titan is the only runner.
+
+### Registering the scenario in titan
+
+Add your service's `testMe/` to titan's system config once:
+
+```yaml
+# titan/config/systems/my-service.yaml
+external_scenarios:
+  my-service: /absolute/path/to/repo/testMe
+```
+
+Then run it with:
+
+```bash
+titan test --system config/systems/my-service.yaml --scenario my-service
+# filter: --only TC-UI-01 TC-UI-07
+# sample: --random 5
+# visible: --headed
+```
+
+Titan resolves `external_scenarios[<scenario-name>]`, imports
+`ui_test_scenarios.py`, finds the first class with `run_all`, navigates to
+`REPORT_URL`, and calls `run_all(only=..., random_n=...)`.
+
+### Where NOT to put tests
+
+| Wrong location | Why it breaks |
+|---|---|
+| `titan/scenarios/<service>/main.py` | Project code in the tool repo — dies on every titan update. |
+| `titan/config/systems/<service>.yaml` (inline tests) | YAML is for connection info, not logic. |
+| `project/tests/` or `project/e2e/` | Titan does not scan those. Use `testMe/` exactly. |
+
+---
+
 ## Test case format
 
 Each test case must contain:

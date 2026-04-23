@@ -1,0 +1,44 @@
+name: idev-website
+base_url: https://i-develop.tech
+environment: prod
+
+auth:
+  type: none
+
+roles:
+  - name: visitor
+    username: ""
+    password: ""
+
+browser:
+  type: chromium
+  headless: true
+  viewport:
+    width: 1440
+    height: 900
+  timeout: 30000
+
+ai:
+  provider: claude_cli
+  model: sonnet
+  depth: deep
+
+external_scenarios:
+  idev-website: /Users/kuznetsov/Projects/iDev/idev-website/testMe
+
+crawl:
+  max_pages: 10
+  screenshot_delay: 1500
+  ignore_patterns:
+    - "/api/*"
+
+viewports:
+  desktop:
+    width: 1440
+    height: 900
+  tablet:
+    width: 768
+    height: 1024
+  mobile:
+    width: 375
+    height: 812

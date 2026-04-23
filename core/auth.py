@@ -10,6 +10,13 @@ async def login(page: Page, config: SystemConfig, role: RoleConfig) -> bool:
     login_url = config.base_url.rstrip("/") + config.auth.login_url
     await page.goto(login_url, wait_until="networkidle", timeout=config.browser.timeout)
 
+    # No credential flow — UI handles entry (e.g. single-button intranet login)
+    if config.auth.type == "none":
+        import asyncio
+
+        await asyncio.sleep(0.5)
+        return True
+
     # Fill credentials
     username_input = page.locator(config.auth.username_selector).first
     password_input = page.locator(config.auth.password_selector).first

@@ -1,0 +1,38 @@
+name: ess
+base_url: https://ess.idev.team
+environment: prod
+
+auth:
+  type: login_password
+  login_url: /auth
+  username_selector: "input[name='email']"
+  password_selector: "input[name='password']"
+  submit_selector: "button.auth-button, form.auth-form button[type='submit']"
+
+roles:
+  - name: manager
+    username: ${TITAN_USERNAME:manager@ess.idev.team}
+    password: ${TITAN_PASSWORD:changeme}
+
+browser:
+  type: chromium
+  headless: true
+  viewport:
+    width: 1440
+    height: 900
+  timeout: 30000
+
+ai:
+  provider: claude_cli
+  model: sonnet
+  depth: deep
+
+external_scenarios:
+  ess: /Users/kuznetsov/Projects/iDev/Employee Share Scheme/testMe
+
+crawl:
+  max_pages: 20
+  screenshot_delay: 1500
+  ignore_patterns:
+    - "/logout"
+    - "/api/*"
