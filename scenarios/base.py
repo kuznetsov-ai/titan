@@ -42,7 +42,9 @@ class BaseScenario:
 
     async def _screenshot(self, name: str) -> str:
         path = self.output_dir / f"{name}.png"
-        await self.page.screenshot(path=str(path), full_page=True)
+        # Viewport-only screenshot (Webwright contract): full_page distorts
+        # visual verification and is heavier. See titan/why_not_engine.md.
+        await self.page.screenshot(path=str(path), full_page=False)
         return str(path)
 
     async def _step(self, name: str):
@@ -167,6 +169,67 @@ class BaseScenario:
                           if "/api/" in e and any(c in e for c in ("400", "422", "500"))]
             return len(api_errors) == 0
         return False
+
+    async def _submit_verified(
+        self,
+        submit_locator,
+        expect: dict[str, str | None],
+        name: str,
+    ) -> tuple[bool, dict]:
+        """Pre-submit self-verify gate for IRREVERSIBLE actions (create/submit/close/delete).
+
+        Unlike _submit_and_check (which clicks first, inspects API errors after),
+        this reads the ACTUAL field values BEFORE the click and aborts if any
+        value didn't stick — preventing a wrong/blank submission. Pattern lifted
+        from akademy_edo_send/send_edo.py (title/kontragent gate).
+
+        Args:
+            submit_locator: Playwright locator for the submit/confirm button.
+            expect: {field_selector: expected_value}. A value of None means
+                "must be non-empty" (e.g. a custom Select that must have committed).
+                A string means input_value() must equal it (stripped).
+            name: short step name; a "<name>_presubmit.png" screenshot is saved.
+
+        Returns:
+            (ok, checks). On gate failure ok=False and the field is NOT submitted;
+            checks holds {"_gate": reason, <selector>: actual_value, ...} for the
+            caller to put into the StepResult description. On pass, it clicks and
+            ok mirrors _submit_and_check (no 400/422/500 API errors).
+        """
+        checks: dict = {}
+        gate_fail: str | None = None
+
+        for selector, expected in expect.items():
+            loc = self.page.locator(selector)
+            if await loc.count() == 0:
+                checks[selector] = "<missing>"
+                gate_fail = gate_fail or f"field_missing:{selector}"
+                continue
+            try:
+                actual = (await loc.first.input_value()).strip()
+            except Exception:
+                # Not an <input>/<textarea> (e.g. a div-based widget) — read text
+                actual = (await loc.first.inner_text()).strip()
+            checks[selector] = actual
+
+            if expected is None:
+                if not actual:
+                    gate_fail = gate_fail or f"empty:{selector}"
+            elif actual != expected.strip():
+                gate_fail = gate_fail or f"mismatch:{selector}"
+
+        # Pre-submit evidence screenshot (always, even on abort)
+        pre_shot = await self._screenshot(f"{name}_presubmit")
+        checks["_presubmit_screenshot"] = pre_shot
+
+        if gate_fail:
+            checks["_gate"] = gate_fail
+            return False, checks  # ABORT — do not click the irreversible button
+
+        # Gate passed → safe to perform the irreversible click
+        ok = await self._submit_and_check(submit_locator)
+        checks["_gate"] = "passed"
+        return ok, checks
 
     async def _close_dialog(self):
         """Close any open dialog or toast notification."""

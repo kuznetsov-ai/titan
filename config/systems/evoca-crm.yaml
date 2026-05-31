@@ -16,7 +16,7 @@ roles:
 
 browser:
   type: chromium
-  headless: false
+  headless: true   # ВСЕГДА headless — не мигать окнами на машине владельца (feedback_titan_headless_always)
   viewport:
     width: 1440
     height: 900

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# delegation-guard: ok — tests for _submit_verified (irreversible-action gate), authored by the contract owner
+import asyncio
 import time
 
 from scenarios.base import BaseScenario, StepResult
@@ -99,3 +101,207 @@ def tmp_output_dir():
     import tempfile
     from pathlib import Path
     return Path(tempfile.mkdtemp())
+
+
+# ---------------------------------------------------------------------------
+# _submit_verified — pre-submit self-verify gate (irreversible actions)
+# delegation-guard: ok — contract owner authoring tests for own new method
+# Contract: the irreversible click (_submit_and_check) happens IFF the gate
+# passes. On any gate failure it returns (False, checks) WITHOUT clicking, and
+# checks["_gate"] names the reason.
+# ---------------------------------------------------------------------------
+
+
+class FakeLocator:
+    """Stands in for a Playwright Locator. `.first` returns self."""
+
+    def __init__(self, *, count=1, input_value=None, inner_text=None, raise_on_input=False):
+        self._count = count
+        self._input_value = input_value
+        self._inner_text = inner_text
+        self._raise_on_input = raise_on_input
+        self.first = self
+
+    async def count(self):
+        return self._count
+
+    async def input_value(self):
+        if self._raise_on_input:
+            raise RuntimeError("element is not an <input>/<textarea>")
+        return self._input_value
+
+    async def inner_text(self):
+        return self._inner_text
+
+
+class GatePage(MockPage):
+    """MockPage that resolves locators from a dict and records screenshots."""
+
+    def __init__(self, locators):
+        super().__init__()
+        self._locators = locators
+        self.screenshot_calls = []
+
+    def locator(self, selector):
+        return self._locators[selector]
+
+    async def screenshot(self, path, **kwargs):
+        self.screenshot_calls.append(path)
+
+
+def _gate_scenario(locators, submit_returns=True):
+    """Build a BaseScenario whose _submit_and_check is stubbed to record calls."""
+    page = GatePage(locators)
+    sc = BaseScenario(page, "http://x", tmp_output_dir())
+    calls = []
+
+    async def fake_submit(loc):
+        calls.append(loc)
+        return submit_returns
+
+    sc._submit_and_check = fake_submit  # seam: assert click happens only on gate pass
+    return sc, calls, page
+
+
+def test_submit_verified_passes_and_clicks():
+    """All fields match → gate passes → _submit_and_check called once, ok=True."""
+    submit = FakeLocator()
+    locators = {
+        "input[name='name']": FakeLocator(input_value="TITAN"),
+        "input[name='phone']": FakeLocator(input_value="+357 99 000000"),
+    }
+    sc, calls, page = _gate_scenario(locators)
+
+    ok, checks = asyncio.run(sc._submit_verified(
+        submit_locator=submit,
+        expect={"input[name='name']": "TITAN", "input[name='phone']": None},
+        name="create",
+    ))
+
+    assert ok is True
+    assert checks["_gate"] == "passed"
+    assert len(calls) == 1           # irreversible click DID happen
+    assert calls[0] is submit
+    assert checks["input[name='name']"] == "TITAN"
+    assert "_presubmit_screenshot" in checks
+    assert len(page.screenshot_calls) == 1
+
+
+def test_submit_verified_aborts_on_empty_required():
+    """expected None + empty actual → gate aborts, NO click."""
+    submit = FakeLocator()
+    locators = {
+        "input[name='name']": FakeLocator(input_value="TITAN"),
+        "input[name='phone']": FakeLocator(input_value="   "),  # whitespace → stripped empty
+    }
+    sc, calls, _ = _gate_scenario(locators)
+
+    ok, checks = asyncio.run(sc._submit_verified(
+        submit_locator=submit,
+        expect={"input[name='name']": "TITAN", "input[name='phone']": None},
+        name="create",
+    ))
+
+    assert ok is False
+    assert checks["_gate"] == "empty:input[name='phone']"
+    assert calls == []               # irreversible click did NOT happen
+    assert "_presubmit_screenshot" in checks  # evidence still captured on abort
+
+
+def test_submit_verified_aborts_on_mismatch():
+    """actual != expected → gate aborts, NO click."""
+    submit = FakeLocator()
+    locators = {"input[name='name']": FakeLocator(input_value="ACTUAL")}
+    sc, calls, _ = _gate_scenario(locators)
+
+    ok, checks = asyncio.run(sc._submit_verified(
+        submit_locator=submit,
+        expect={"input[name='name']": "EXPECTED"},
+        name="create",
+    ))
+
+    assert ok is False
+    assert checks["_gate"] == "mismatch:input[name='name']"
+    assert calls == []
+
+
+def test_submit_verified_aborts_on_missing_field():
+    """locator count 0 → field_missing, NO click, value marked <missing>."""
+    submit = FakeLocator()
+    locators = {"input[name='gone']": FakeLocator(count=0)}
+    sc, calls, _ = _gate_scenario(locators)
+
+    ok, checks = asyncio.run(sc._submit_verified(
+        submit_locator=submit,
+        expect={"input[name='gone']": "anything"},
+        name="create",
+    ))
+
+    assert ok is False
+    assert checks["_gate"] == "field_missing:input[name='gone']"
+    assert checks["input[name='gone']"] == "<missing>"
+    assert calls == []
+
+
+def test_submit_verified_inner_text_fallback_for_custom_select():
+    """input_value() raising (non-input widget) → falls back to inner_text(); matches → passes.
+
+    This is the custom-Select path the gate's None-expect is designed for.
+    """
+    submit = FakeLocator()
+    locators = {
+        "div[name='abuse_type']": FakeLocator(raise_on_input=True, inner_text="Arbitrage"),
+    }
+    sc, calls, _ = _gate_scenario(locators)
+
+    ok, checks = asyncio.run(sc._submit_verified(
+        submit_locator=submit,
+        expect={"div[name='abuse_type']": None},  # must be non-empty
+        name="create",
+    ))
+
+    assert ok is True
+    assert checks["_gate"] == "passed"
+    assert checks["div[name='abuse_type']"] == "Arbitrage"
+    assert len(calls) == 1
+
+
+def test_submit_verified_gate_pass_but_api_error_is_distinguishable():
+    """Gate passes but _submit_and_check returns False (API 4xx/5xx).
+
+    ok=False but _gate=='passed' — lets the caller tell 'submitted-with-error'
+    apart from 'aborted-before-click'.
+    """
+    submit = FakeLocator()
+    locators = {"input[name='name']": FakeLocator(input_value="TITAN")}
+    sc, calls, _ = _gate_scenario(locators, submit_returns=False)
+
+    ok, checks = asyncio.run(sc._submit_verified(
+        submit_locator=submit,
+        expect={"input[name='name']": "TITAN"},
+        name="create",
+    ))
+
+    assert ok is False
+    assert checks["_gate"] == "passed"   # NOT an abort reason
+    assert len(calls) == 1               # the click DID happen
+
+
+def test_submit_verified_first_failure_wins():
+    """Multiple bad fields → gate reports the FIRST encountered (dict order)."""
+    submit = FakeLocator()
+    locators = {
+        "input[name='a']": FakeLocator(input_value=""),        # empty (required)
+        "input[name='b']": FakeLocator(input_value="WRONG"),   # mismatch
+    }
+    sc, calls, _ = _gate_scenario(locators)
+
+    ok, checks = asyncio.run(sc._submit_verified(
+        submit_locator=submit,
+        expect={"input[name='a']": None, "input[name='b']": "RIGHT"},
+        name="create",
+    ))
+
+    assert ok is False
+    assert checks["_gate"] == "empty:input[name='a']"  # first field wins
+    assert calls == []
